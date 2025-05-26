@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2025 Ryan Cao <hello@ryanccn.dev>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "arkencrab"
+description = "Experimental arkenfox toolbox"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anstream = "0.6.18"
+chrono = { version = "0.4.41", default-features = false, features = ["std", "clock"] }
+clap = { version = "4.5.38", features = ["derive"] }
+clap_complete = "4.5.50"
+color-eyre = { version = "0.6.4", default-features = false }
+eyre = "0.6.12"
+owo-colors = "4.2.1"
+regex = "1.11.1"
+reqwest = { version = "0.12.15", features = ["charset", "http2", "macos-system-configuration", "rustls-tls-webpki-roots", "gzip", "brotli", "zstd"], default-features = false }
+similar = "2.7.0"
+tokio = { version = "1.45.1", features = ["full"] }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

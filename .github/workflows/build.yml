@@ -1,0 +1,131 @@
+# SPDX-FileCopyrightText: 2025 Ryan Cao <hello@ryanccn.dev>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_call:
+    inputs:
+      disable-cache:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    permissions:
+      id-token: write
+      attestations: write
+
+    strategy:
+      matrix:
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+          - aarch64-pc-windows-msvc
+          - x86_64-pc-windows-msvc
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+          - target: aarch64-pc-windows-msvc
+            runner: windows-latest
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+      fail-fast: false
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # ratchet:dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # ratchet:Swatinem/rust-cache@v2
+        if: ${{ inputs.disable-cache != true }}
+
+      - name: Install cargo-auditable
+        uses: taiki-e/install-action@6c6479b49816fcc0975a31af977bdc1f847c2920 # ratchet:taiki-e/install-action@v2
+        with:
+          tool: cargo-auditable
+
+      - name: Build
+        run: cargo auditable build --release --locked --target ${{ matrix.target }}
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "fat"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+
+      - name: Generate build provenance attestations
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # ratchet:actions/attest-build-provenance@v2
+        if: ${{ github.event_name != 'pull_request' }}
+        with:
+          subject-path: |
+            ./target/${{ matrix.target }}/release/arkencrab
+            ./target/${{ matrix.target }}/release/arkencrab.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          if-no-files-found: "error"
+          name: arkencrab-${{ matrix.target }}
+          path: |
+            ./target/${{ matrix.target }}/release/arkencrab
+            ./target/${{ matrix.target }}/release/arkencrab.exe
+
+  linux-static:
+    permissions:
+      id-token: write
+      attestations: write
+
+    strategy:
+      matrix:
+        target:
+          - "x86_64-unknown-linux-musl"
+          - "aarch64-unknown-linux-musl"
+        include:
+          - target: "x86_64-unknown-linux-musl"
+            runner: ubuntu-24.04
+          - target: "aarch64-unknown-linux-musl"
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # ratchet:cachix/install-nix-action@v31
+
+      - name: Build
+        run: nix build --fallback --print-build-logs '.#arkencrab-static-${{ matrix.target }}'
+
+      - name: Generate build provenance attestations
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # ratchet:actions/attest-build-provenance@v2
+        if: ${{ github.event_name != 'pull_request' }}
+        with:
+          subject-path: ./result/bin/arkencrab
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          if-no-files-found: "error"
+          name: arkencrab-${{ matrix.target }}
+          path: ./result/bin/arkencrab
