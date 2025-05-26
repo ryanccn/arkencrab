@@ -154,7 +154,7 @@ fn now() -> String {
 #[derive(clap::Parser, Debug, Clone)]
 struct Cli {
     /// The Firefox profile directory to operate on (defaults to first installation's default profile in profiles.ini)
-    #[clap(global = true)]
+    #[clap(short, long, global = true)]
     profile: Option<PathBuf>,
 
     #[clap(subcommand)]
