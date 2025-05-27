@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Ryan Cao <hello@ryanccn.dev>
+// SPDX-FileCopyrightText: 2025 Seth Flynn <getchoo@tuta.io>
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -48,14 +49,16 @@ fn home_dir() -> Result<PathBuf> {
 }
 
 #[cfg(windows)]
-fn home_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        env::var_os("USERPROFILE").ok_or_eyre("could not obtain home directory")?,
-    ))
+fn roaming_appdata() -> Result<PathBuf> {
+    let appdata = env::var_os("APPDATA").ok_or_eyre("could not obtain APPDATA directory")?;
+    Ok(PathBuf::from(appdata))
 }
 
 async fn default_profile() -> Result<PathBuf> {
+    #[cfg(unix)]
     let home = home_dir()?;
+    #[cfg(windows)]
+    let roaming_appdata = roaming_appdata()?;
 
     let firefox_data_paths = [
         home.join(".mozilla").join("firefox"),
@@ -72,10 +75,8 @@ async fn default_profile() -> Result<PathBuf> {
         home.join("Library")
             .join("Application Support")
             .join("Firefox"),
-        home.join("AppData")
-            .join("Roaming")
-            .join("Mozilla")
-            .join("Firefox"),
+        #[cfg(windows)]
+        roaming_appdata.join("Mozilla").join("Firefox"),
     ];
 
     for path in &firefox_data_paths {
