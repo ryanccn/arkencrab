@@ -3,19 +3,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{
-    borrow::Cow,
-    collections::HashSet,
-    convert::AsRef,
-    env, fs, io,
-    path::{Path, PathBuf},
-    sync::LazyLock,
-};
+mod cli;
+mod profiles;
+
+use std::{borrow::Cow, collections::HashSet, env, fs, io, path::Path, sync::LazyLock};
+
+use cli::{Cli, Command};
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
-use eyre::{OptionExt, Result, bail};
-use ini::Ini;
+use eyre::Result;
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
@@ -38,83 +35,11 @@ static REGEX_USER_PREF: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-// `env::home_dir` stabilized in latest Rust but not in Nixpkgs Rust, so we implement
-// a knockoff version ourselves.
-#[cfg(unix)]
-fn home_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        env::var_os("HOME").ok_or_eyre("could not obtain home directory")?,
-    ))
-}
-
-#[cfg(windows)]
-fn roaming_appdata() -> Result<PathBuf> {
-    let appdata = env::var_os("APPDATA").ok_or_eyre("could not obtain APPDATA directory")?;
-    Ok(PathBuf::from(appdata))
-}
-
-fn default_profile_path_in<T: AsRef<Path>>(profiles_ini: T) -> Result<String> {
-    let ini = Ini::load_from_file(profiles_ini)?;
-
-    ini.iter()
-        .find_map(|(maybe_section_name, properties)| {
-            let section_name = maybe_section_name?;
-
-            if section_name.starts_with("Install") {
-                properties.get("Default").map(ToString::to_string)
-            } else {
-                None
-            }
-        })
-        .ok_or_eyre("unable to obtain default profile from profiles.ini")
-}
-
-fn default_profile() -> Result<PathBuf> {
-    #[cfg(unix)]
-    let home = home_dir()?;
-    #[cfg(windows)]
-    let roaming_appdata = roaming_appdata()?;
-
-    let firefox_data_paths = [
-        #[cfg(all(unix, not(target_os = "macos")))]
-        home.join(".mozilla").join("firefox"),
-        #[cfg(all(unix, not(target_os = "macos")))]
-        home.join("snap")
-            .join("firefox")
-            .join("common")
-            .join(".mozilla")
-            .join("firefox"),
-        #[cfg(all(unix, not(target_os = "macos")))]
-        home.join(".var")
-            .join("app")
-            .join("org.mozilla.firefox")
-            .join(".mozilla")
-            .join("firefox"),
-        #[cfg(target_os = "macos")]
-        home.join("Library")
-            .join("Application Support")
-            .join("Firefox"),
-        #[cfg(windows)]
-        roaming_appdata.join("Mozilla").join("Firefox"),
-    ];
-
-    for path in &firefox_data_paths {
-        let profiles_ini = path.join("profiles.ini");
-
-        if profiles_ini.exists() {
-            let default_profile_path = default_profile_path_in(&profiles_ini)?;
-            return Ok(path.join(default_profile_path));
-        }
-    }
-
-    bail!("could not find default profile")
-}
-
 fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
     let profile = if let Some(p) = &cli.profile {
         Cow::Borrowed(p.as_path())
     } else {
-        let profile = default_profile()?;
+        let profile = profiles::default_profile()?;
         Cow::Owned(profile)
     };
 
@@ -165,47 +90,6 @@ fn print_diff(old: &str, new: &str) {
 
 fn now() -> String {
     chrono::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string()
-}
-
-#[derive(clap::Parser, Debug, Clone)]
-struct Cli {
-    /// The Firefox profile directory to operate on (defaults to first installation's default profile in profiles.ini)
-    #[clap(short, long, global = true)]
-    profile: Option<PathBuf>,
-
-    #[clap(subcommand)]
-    command: Command,
-}
-
-#[derive(clap::Subcommand, Debug, Clone)]
-enum Command {
-    /// Update the arkenfox user.js
-    Update {
-        /// Show a diff of the changes
-        #[clap(short, long)]
-        diff: bool,
-
-        /// Don't add overrides from user-overrides.js
-        #[clap(short, long)]
-        no_overrides: bool,
-
-        /// Enable preferences for Firefox ESR
-        #[clap(long)]
-        esr: bool,
-    },
-
-    /// Clean redundant preferences in prefs.js
-    PrefsClean {
-        /// Show a diff of the changes (will be large)
-        #[clap(short, long)]
-        diff: bool,
-    },
-
-    /// Generate shell completions
-    Completions {
-        /// The shell to generate completions for
-        shell: clap_complete::Shell,
-    },
 }
 
 fn main() -> Result<()> {
@@ -335,23 +219,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use eyre::Result;
-
-    #[test]
-    fn can_find_default_profile_path() -> Result<()> {
-        let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let profiles_ini = root_dir.join("src/profiles.ini");
-
-        let result = super::default_profile_path_in(&profiles_ini)?;
-        let expected = String::from("Profiles/arkenfox");
-
-        assert_eq!(result, expected);
-        Ok(())
-    }
 }
