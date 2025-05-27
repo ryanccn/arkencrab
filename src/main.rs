@@ -13,7 +13,7 @@ use tokio::fs;
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
-use eyre::{Result, eyre};
+use eyre::{OptionExt, Result, bail};
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
@@ -43,14 +43,14 @@ static REGEX_USER_PREF: LazyLock<Regex> = LazyLock::new(|| {
 #[cfg(unix)]
 fn home_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(
-        env::var_os("HOME").ok_or_else(|| eyre!("could not obtain home directory"))?,
+        env::var_os("HOME").ok_or_eyre("could not obtain home directory")?,
     ))
 }
 
 #[cfg(windows)]
 fn home_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(
-        env::var_os("USERPROFILE").ok_or_else(|| eyre!("could not obtain home directory"))?,
+        env::var_os("USERPROFILE").ok_or_eyre("could not obtain home directory")?,
     ))
 }
 
@@ -91,7 +91,7 @@ async fn default_profile() -> Result<PathBuf> {
         }
     }
 
-    Err(eyre!("could not find default profile"))
+    bail!("could not find default profile")
 }
 
 async fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
