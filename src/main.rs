@@ -13,7 +13,8 @@ use std::{
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
-use eyre::{OptionExt, Result, bail};
+use eyre::{ContextCompat, OptionExt, Result, bail};
+use ini::Ini;
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
@@ -51,6 +52,22 @@ fn roaming_appdata() -> Result<PathBuf> {
     Ok(PathBuf::from(appdata))
 }
 
+fn default_profile_path_in(profiles_ini: &PathBuf) -> Result<String> {
+    let ini = Ini::load_from_file(profiles_ini)?;
+
+    ini.iter()
+        .find_map(|(maybe_section_name, properties)| {
+            let section_name = maybe_section_name?;
+
+            if section_name.starts_with("Install") {
+                properties.get("Default").map(ToString::to_string)
+            } else {
+                None
+            }
+        })
+        .wrap_err("unable to obtain default profile from profiles.ini")
+}
+
 fn default_profile() -> Result<PathBuf> {
     #[cfg(unix)]
     let home = home_dir()?;
@@ -81,15 +98,11 @@ fn default_profile() -> Result<PathBuf> {
     ];
 
     for path in &firefox_data_paths {
-        if let Ok(ini) = fs::read_to_string(path.join("profiles.ini")) {
-            if let Some(default_profile) = ini
-                .lines()
-                .find(|l| l.starts_with("Default=Profiles/"))
-                .and_then(|l| l.strip_prefix("Default="))
-                .map(|p| path.join(p))
-            {
-                return Ok(default_profile);
-            }
+        let profiles_ini = path.join("profiles.ini");
+
+        if profiles_ini.exists() {
+            let default_profile_path = default_profile_path_in(&profiles_ini)?;
+            return Ok(path.join(default_profile_path));
         }
     }
 
@@ -321,4 +334,23 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use eyre::Result;
+
+    #[test]
+    fn can_find_default_profile_path() -> Result<()> {
+        let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let profiles_ini = root_dir.join("src/profiles.ini");
+
+        let result = super::default_profile_path_in(&profiles_ini)?;
+        let expected = String::from("Profiles/arkenfox");
+
+        assert_eq!(result, expected);
+        Ok(())
+    }
 }
