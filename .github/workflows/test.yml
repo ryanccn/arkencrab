@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2025 Ryan Cao <hello@ryanccn.dev>
+# SPDX-FileCopyrightText: 2025 Seth Flynn <getchoo@tuta.io>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+          - target: aarch64-pc-windows-msvc
+            runner: windows-latest
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+      fail-fast: false
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # ratchet:dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # ratchet:Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --locked
