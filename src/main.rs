@@ -18,9 +18,6 @@ use eyre::{OptionExt, Result, bail};
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
-static HTTP: LazyLock<reqwest::Client> =
-    LazyLock::new(|| reqwest::Client::builder().https_only(true).build().unwrap());
-
 static USER_JS_URL: &str =
     "https://raw.githubusercontent.com/arkenfox/user.js/refs/heads/master/user.js";
 
@@ -229,7 +226,9 @@ async fn main() -> Result<()> {
                     .display()
             );
 
-            let mut new_user = HTTP
+            let http = reqwest::Client::builder().https_only(true).build()?;
+
+            let mut new_user = http
                 .get(USER_JS_URL)
                 .send()
                 .await?
