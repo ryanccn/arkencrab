@@ -40,7 +40,6 @@ static REGEX_USER_PREF: LazyLock<Regex> = LazyLock::new(|| {
 
 // `env::home_dir` stabilized in latest Rust but not in Nixpkgs Rust, so we implement
 // a knockoff version ourselves.
-
 #[cfg(unix)]
 fn home_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(
@@ -61,17 +60,21 @@ async fn default_profile() -> Result<PathBuf> {
     let roaming_appdata = roaming_appdata()?;
 
     let firefox_data_paths = [
+        #[cfg(all(unix, not(target_os = "macos")))]
         home.join(".mozilla").join("firefox"),
+        #[cfg(all(unix, not(target_os = "macos")))]
         home.join("snap")
             .join("firefox")
             .join("common")
             .join(".mozilla")
             .join("firefox"),
+        #[cfg(all(unix, not(target_os = "macos")))]
         home.join(".var")
             .join("app")
             .join("org.mozilla.firefox")
             .join(".mozilla")
             .join("firefox"),
+        #[cfg(target_os = "macos")]
         home.join("Library")
             .join("Application Support")
             .join("Firefox"),
