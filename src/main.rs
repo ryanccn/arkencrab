@@ -6,6 +6,7 @@
 use std::{
     borrow::Cow,
     collections::HashSet,
+    convert::AsRef,
     env, fs, io,
     path::{Path, PathBuf},
     sync::LazyLock,
@@ -13,7 +14,7 @@ use std::{
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
-use eyre::{ContextCompat, OptionExt, Result, bail};
+use eyre::{OptionExt, Result, bail};
 use ini::Ini;
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
@@ -52,7 +53,7 @@ fn roaming_appdata() -> Result<PathBuf> {
     Ok(PathBuf::from(appdata))
 }
 
-fn default_profile_path_in(profiles_ini: &PathBuf) -> Result<String> {
+fn default_profile_path_in<T: AsRef<Path>>(profiles_ini: T) -> Result<String> {
     let ini = Ini::load_from_file(profiles_ini)?;
 
     ini.iter()
@@ -65,7 +66,7 @@ fn default_profile_path_in(profiles_ini: &PathBuf) -> Result<String> {
                 None
             }
         })
-        .wrap_err("unable to obtain default profile from profiles.ini")
+        .ok_or_eyre("unable to obtain default profile from profiles.ini")
 }
 
 fn default_profile() -> Result<PathBuf> {
