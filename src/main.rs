@@ -18,6 +18,8 @@ use eyre::{OptionExt, Result, bail};
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
+static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
 static USER_JS_URL: &str =
     "https://raw.githubusercontent.com/arkenfox/user.js/refs/heads/master/user.js";
 
@@ -226,7 +228,10 @@ async fn main() -> Result<()> {
                     .display()
             );
 
-            let http = reqwest::Client::builder().https_only(true).build()?;
+            let http = reqwest::Client::builder()
+                .https_only(true)
+                .user_agent(USER_AGENT)
+                .build()?;
 
             let mut new_user = http
                 .get(USER_JS_URL)
