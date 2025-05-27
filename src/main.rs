@@ -6,11 +6,10 @@
 use std::{
     borrow::Cow,
     collections::HashSet,
-    env, io,
+    env, fs, io,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
-use tokio::fs;
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
@@ -52,7 +51,7 @@ fn roaming_appdata() -> Result<PathBuf> {
     Ok(PathBuf::from(appdata))
 }
 
-async fn default_profile() -> Result<PathBuf> {
+fn default_profile() -> Result<PathBuf> {
     #[cfg(unix)]
     let home = home_dir()?;
     #[cfg(windows)]
@@ -82,7 +81,7 @@ async fn default_profile() -> Result<PathBuf> {
     ];
 
     for path in &firefox_data_paths {
-        if let Ok(ini) = fs::read_to_string(path.join("profiles.ini")).await {
+        if let Ok(ini) = fs::read_to_string(path.join("profiles.ini")) {
             if let Some(default_profile) = ini
                 .lines()
                 .find(|l| l.starts_with("Default=Profiles/"))
@@ -97,11 +96,11 @@ async fn default_profile() -> Result<PathBuf> {
     bail!("could not find default profile")
 }
 
-async fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
+fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
     let profile = if let Some(p) = &cli.profile {
         Cow::Borrowed(p.as_path())
     } else {
-        let profile = default_profile().await?;
+        let profile = default_profile()?;
         Cow::Owned(profile)
     };
 
@@ -109,8 +108,8 @@ async fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
     Ok(profile)
 }
 
-async fn read_string_with_default(path: impl AsRef<Path>) -> Result<String> {
-    match fs::read_to_string(path).await {
+fn read_string_with_default(path: impl AsRef<Path>) -> Result<String> {
+    match fs::read_to_string(path) {
         Ok(s) => Ok(s),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(String::new()),
         Err(err) => Err(err.into()),
@@ -195,8 +194,7 @@ enum Command {
     },
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
 
     let cli = Cli::parse();
@@ -207,17 +205,17 @@ async fn main() -> Result<()> {
             no_overrides,
             esr,
         } => {
-            let profile = resolve_profile(&cli).await?;
+            let profile = resolve_profile(&cli)?;
 
-            let existing_user = read_string_with_default(profile.join("user.js")).await?;
+            let existing_user = read_string_with_default(profile.join("user.js"))?;
             let existing_version = find_version(&existing_user);
 
             let backup = profile
                 .join("userjs_backups")
                 .join(format!("user.js.backup.{}", now()));
 
-            fs::create_dir_all(profile.join("userjs_backups")).await?;
-            fs::write(&backup, &existing_user).await?;
+            fs::create_dir_all(profile.join("userjs_backups"))?;
+            fs::write(&backup, &existing_user)?;
 
             println!(
                 "{} user.js to {}",
@@ -228,18 +226,12 @@ async fn main() -> Result<()> {
                     .display()
             );
 
-            let http = reqwest::Client::builder()
+            let http = reqwest::blocking::Client::builder()
                 .https_only(true)
                 .user_agent(USER_AGENT)
                 .build()?;
 
-            let mut new_user = http
-                .get(USER_JS_URL)
-                .send()
-                .await?
-                .error_for_status()?
-                .text()
-                .await?;
+            let mut new_user = http.get(USER_JS_URL).send()?.error_for_status()?.text()?;
 
             let this_version = find_version(&new_user);
 
@@ -248,12 +240,12 @@ async fn main() -> Result<()> {
             }
 
             if !no_overrides {
-                let overrides = read_string_with_default(profile.join("user-overrides.js")).await?;
+                let overrides = read_string_with_default(profile.join("user-overrides.js"))?;
                 new_user += "\n";
                 new_user += &overrides;
             }
 
-            fs::write(profile.join("user.js"), &new_user).await?;
+            fs::write(profile.join("user.js"), &new_user)?;
 
             if *diff {
                 print_diff(&existing_user, &new_user);
@@ -282,17 +274,17 @@ async fn main() -> Result<()> {
         }
 
         Command::PrefsClean { diff } => {
-            let profile = resolve_profile(&cli).await?;
+            let profile = resolve_profile(&cli)?;
 
-            let user = read_string_with_default(profile.join("user.js")).await?;
-            let existing_prefs = read_string_with_default(profile.join("prefs.js")).await?;
+            let user = read_string_with_default(profile.join("user.js"))?;
+            let existing_prefs = read_string_with_default(profile.join("prefs.js"))?;
 
             let backup = profile
                 .join("prefsjs_backups")
                 .join(format!("prefs.js.backup.{}", now()));
 
-            fs::create_dir_all(profile.join("prefsjs_backups")).await?;
-            fs::write(&backup, &existing_prefs).await?;
+            fs::create_dir_all(profile.join("prefsjs_backups"))?;
+            fs::write(&backup, &existing_prefs)?;
 
             println!(
                 "{} prefs.js to {}",
@@ -319,7 +311,7 @@ async fn main() -> Result<()> {
                 print_diff(&existing_prefs, &new_prefs);
             }
 
-            fs::write(profile.join("prefs.js"), &new_prefs).await?;
+            fs::write(profile.join("prefs.js"), &new_prefs)?;
             println!("{} {} redundant prefs", "removed".red(), discarded_prefs);
         }
 
