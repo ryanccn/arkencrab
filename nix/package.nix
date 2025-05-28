@@ -56,8 +56,6 @@ rustPlatform.buildRustPackage (finalAttrs: {
       --fish <("$out/bin/${finalAttrs.pname}" completions fish)
   '';
 
-  doCheck = false;
-
   passthru = {
     cargoToml = lib.importTOML ../Cargo.toml;
   };

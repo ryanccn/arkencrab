@@ -1,24 +1,22 @@
 // SPDX-FileCopyrightText: 2025 Ryan Cao <hello@ryanccn.dev>
+// SPDX-FileCopyrightText: 2025 Seth Flynn <getchoo@tuta.io>
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{
-    borrow::Cow,
-    collections::HashSet,
-    env, io,
-    path::{Path, PathBuf},
-    sync::LazyLock,
-};
-use tokio::fs;
+mod cli;
+mod profiles;
+
+use std::{borrow::Cow, collections::HashSet, env, fs, io, path::Path, sync::LazyLock};
+
+use cli::{Cli, Command};
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
-use eyre::{Result, eyre};
+use eyre::Result;
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
-static HTTP: LazyLock<reqwest::Client> =
-    LazyLock::new(|| reqwest::Client::builder().https_only(true).build().unwrap());
+static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 static USER_JS_URL: &str =
     "https://raw.githubusercontent.com/arkenfox/user.js/refs/heads/master/user.js";
@@ -37,68 +35,11 @@ static REGEX_USER_PREF: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-// `env::home_dir` stabilized in latest Rust but not in Nixpkgs Rust, so we implement
-// a knockoff version ourselves.
-
-#[cfg(unix)]
-fn home_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        env::var_os("HOME").ok_or_else(|| eyre!("could not obtain home directory"))?,
-    ))
-}
-
-#[cfg(windows)]
-fn home_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(
-        env::var_os("USERPROFILE").ok_or_else(|| eyre!("could not obtain home directory"))?,
-    ))
-}
-
-async fn default_profile() -> Result<PathBuf> {
-    let home = home_dir()?;
-
-    let firefox_data_paths = [
-        home.join(".mozilla").join("firefox"),
-        home.join("snap")
-            .join("firefox")
-            .join("common")
-            .join(".mozilla")
-            .join("firefox"),
-        home.join(".var")
-            .join("app")
-            .join("org.mozilla.firefox")
-            .join(".mozilla")
-            .join("firefox"),
-        home.join("Library")
-            .join("Application Support")
-            .join("Firefox"),
-        home.join("AppData")
-            .join("Roaming")
-            .join("Mozilla")
-            .join("Firefox"),
-    ];
-
-    for path in &firefox_data_paths {
-        if let Ok(ini) = fs::read_to_string(path.join("profiles.ini")).await {
-            if let Some(default_profile) = ini
-                .lines()
-                .find(|l| l.starts_with("Default=Profiles/"))
-                .and_then(|l| l.strip_prefix("Default="))
-                .map(|p| path.join(p))
-            {
-                return Ok(default_profile);
-            }
-        }
-    }
-
-    Err(eyre!("could not find default profile"))
-}
-
-async fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
+fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
     let profile = if let Some(p) = &cli.profile {
         Cow::Borrowed(p.as_path())
     } else {
-        let profile = default_profile().await?;
+        let profile = profiles::default_profile()?;
         Cow::Owned(profile)
     };
 
@@ -106,8 +47,8 @@ async fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
     Ok(profile)
 }
 
-async fn read_string_with_default(path: impl AsRef<Path>) -> Result<String> {
-    match fs::read_to_string(path).await {
+fn read_string_with_default(path: impl AsRef<Path>) -> Result<String> {
+    match fs::read_to_string(path) {
         Ok(s) => Ok(s),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(String::new()),
         Err(err) => Err(err.into()),
@@ -151,49 +92,7 @@ fn now() -> String {
     chrono::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string()
 }
 
-#[derive(clap::Parser, Debug, Clone)]
-struct Cli {
-    /// The Firefox profile directory to operate on (defaults to first installation's default profile in profiles.ini)
-    #[clap(short, long, global = true)]
-    profile: Option<PathBuf>,
-
-    #[clap(subcommand)]
-    command: Command,
-}
-
-#[derive(clap::Subcommand, Debug, Clone)]
-enum Command {
-    /// Update the arkenfox user.js
-    Update {
-        /// Show a diff of the changes
-        #[clap(short, long)]
-        diff: bool,
-
-        /// Don't add overrides from user-overrides.js
-        #[clap(short, long)]
-        no_overrides: bool,
-
-        /// Enable preferences for Firefox ESR
-        #[clap(long)]
-        esr: bool,
-    },
-
-    /// Clean redundant preferences in prefs.js
-    PrefsClean {
-        /// Show a diff of the changes (will be large)
-        #[clap(short, long)]
-        diff: bool,
-    },
-
-    /// Generate shell completions
-    Completions {
-        /// The shell to generate completions for
-        shell: clap_complete::Shell,
-    },
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
 
     let cli = Cli::parse();
@@ -204,17 +103,17 @@ async fn main() -> Result<()> {
             no_overrides,
             esr,
         } => {
-            let profile = resolve_profile(&cli).await?;
+            let profile = resolve_profile(&cli)?;
 
-            let existing_user = read_string_with_default(profile.join("user.js")).await?;
+            let existing_user = read_string_with_default(profile.join("user.js"))?;
             let existing_version = find_version(&existing_user);
 
             let backup = profile
                 .join("userjs_backups")
                 .join(format!("user.js.backup.{}", now()));
 
-            fs::create_dir_all(profile.join("userjs_backups")).await?;
-            fs::write(&backup, &existing_user).await?;
+            fs::create_dir_all(profile.join("userjs_backups"))?;
+            fs::write(&backup, &existing_user)?;
 
             println!(
                 "{} user.js to {}",
@@ -225,13 +124,12 @@ async fn main() -> Result<()> {
                     .display()
             );
 
-            let mut new_user = HTTP
-                .get(USER_JS_URL)
-                .send()
-                .await?
-                .error_for_status()?
-                .text()
-                .await?;
+            let http = reqwest::blocking::Client::builder()
+                .https_only(true)
+                .user_agent(USER_AGENT)
+                .build()?;
+
+            let mut new_user = http.get(USER_JS_URL).send()?.error_for_status()?.text()?;
 
             let this_version = find_version(&new_user);
 
@@ -240,12 +138,12 @@ async fn main() -> Result<()> {
             }
 
             if !no_overrides {
-                let overrides = read_string_with_default(profile.join("user-overrides.js")).await?;
+                let overrides = read_string_with_default(profile.join("user-overrides.js"))?;
                 new_user += "\n";
                 new_user += &overrides;
             }
 
-            fs::write(profile.join("user.js"), &new_user).await?;
+            fs::write(profile.join("user.js"), &new_user)?;
 
             if *diff {
                 print_diff(&existing_user, &new_user);
@@ -274,17 +172,17 @@ async fn main() -> Result<()> {
         }
 
         Command::PrefsClean { diff } => {
-            let profile = resolve_profile(&cli).await?;
+            let profile = resolve_profile(&cli)?;
 
-            let user = read_string_with_default(profile.join("user.js")).await?;
-            let existing_prefs = read_string_with_default(profile.join("prefs.js")).await?;
+            let user = read_string_with_default(profile.join("user.js"))?;
+            let existing_prefs = read_string_with_default(profile.join("prefs.js"))?;
 
             let backup = profile
                 .join("prefsjs_backups")
                 .join(format!("prefs.js.backup.{}", now()));
 
-            fs::create_dir_all(profile.join("prefsjs_backups")).await?;
-            fs::write(&backup, &existing_prefs).await?;
+            fs::create_dir_all(profile.join("prefsjs_backups"))?;
+            fs::write(&backup, &existing_prefs)?;
 
             println!(
                 "{} prefs.js to {}",
@@ -311,7 +209,7 @@ async fn main() -> Result<()> {
                 print_diff(&existing_prefs, &new_prefs);
             }
 
-            fs::write(profile.join("prefs.js"), &new_prefs).await?;
+            fs::write(profile.join("prefs.js"), &new_prefs)?;
             println!("{} {} redundant prefs", "removed".red(), discarded_prefs);
         }
 
