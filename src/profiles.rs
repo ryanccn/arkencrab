@@ -52,13 +52,15 @@ pub fn default_profile() -> Result<PathBuf> {
     let firefox_data_paths = [
         #[cfg(all(unix, not(target_os = "macos")))]
         home.join(".mozilla").join("firefox"),
-        #[cfg(all(unix, not(target_os = "macos")))]
+        // Snap
+        #[cfg(target_os = "linux")]
         home.join("snap")
             .join("firefox")
             .join("common")
             .join(".mozilla")
             .join("firefox"),
-        #[cfg(all(unix, not(target_os = "macos")))]
+        // Flatpak
+        #[cfg(target_os = "linux")]
         home.join(".var")
             .join("app")
             .join("org.mozilla.firefox")
