@@ -5,7 +5,7 @@
 
 use std::{
     convert::AsRef,
-    env,
+    env, io,
     path::{Path, PathBuf},
 };
 
@@ -77,9 +77,16 @@ pub fn default_profile() -> Result<PathBuf> {
     for path in &firefox_data_paths {
         let profiles_ini = path.join("profiles.ini");
 
-        if profiles_ini.exists() {
-            let default_profile_path = default_profile_path_in(&profiles_ini)?;
-            return Ok(path.join(default_profile_path));
+        match default_profile_path_in(&profiles_ini) {
+            Ok(default_profile_path) => return Ok(path.join(default_profile_path)),
+            Err(err)
+                if err
+                    .downcast_ref::<ini::Error>()
+                    .is_some_and(|err| match err {
+                        ini::Error::Io(err) => err.kind() == io::ErrorKind::NotFound,
+                        ini::Error::Parse(_) => false,
+                    }) => {}
+            Err(err) => return Err(err),
         }
     }
 

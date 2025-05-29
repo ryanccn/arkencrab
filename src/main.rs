@@ -3,23 +3,33 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-mod cli;
-mod profiles;
-
-use std::{borrow::Cow, collections::HashSet, env, fs, io, path::Path, sync::LazyLock};
-
-use cli::{Cli, Command};
+use std::{
+    borrow::Cow, collections::HashSet, env, fs, io, path::Path, process::Command as StdCommand,
+    sync::LazyLock,
+};
 
 use anstream::{print, println};
 use clap::{CommandFactory as _, Parser};
-use eyre::Result;
+use eyre::{Result, bail, eyre};
 use owo_colors::OwoColorize as _;
 use regex::{Regex, RegexBuilder};
 
-static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+use crate::cli::{Cli, Command};
+
+mod cli;
+mod profiles;
+
+static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 static USER_JS_URL: &str =
     "https://raw.githubusercontent.com/arkenfox/user.js/refs/heads/master/user.js";
+
+#[cfg(unix)]
+static DEFAULT_EDITOR: &str = "nano";
+#[cfg(windows)]
+static DEFAULT_EDITOR: &str = "notepad.exe";
+
+static ARKENCRAB_START_MARKER: &str = "/** START: arkencrab overrides */";
 
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| {
     RegexBuilder::new(r"^\*\s*version:\s*(\d+)")
@@ -140,6 +150,8 @@ fn main() -> Result<()> {
             if !no_overrides {
                 let overrides = read_string_with_default(profile.join("user-overrides.js"))?;
                 new_user += "\n";
+                new_user += ARKENCRAB_START_MARKER;
+                new_user += "\n\n";
                 new_user += &overrides;
             }
 
@@ -211,6 +223,77 @@ fn main() -> Result<()> {
 
             fs::write(profile.join("prefs.js"), &new_prefs)?;
             println!("{} {} redundant prefs", "removed".red(), discarded_prefs);
+        }
+
+        Command::Edit { editor, no_apply } => {
+            let profile = resolve_profile(&cli)?;
+
+            let mut editor = editor
+                .as_ref()
+                .and_then(|s| shlex::split(s))
+                .unwrap_or_else(|| vec![DEFAULT_EDITOR.to_owned()]);
+
+            let program = editor
+                .pop()
+                .ok_or_else(|| eyre!("invalid editor provided"))?;
+
+            let status = StdCommand::new(&program)
+                .args(&editor)
+                .arg(profile.join("user-overrides.js"))
+                .status()?;
+
+            if !status.success() {
+                bail!("editor failed with status code {:?}", status.code())
+            }
+
+            let existing_user = read_string_with_default(profile.join("user.js"))?;
+            let existing_version = find_version(&existing_user);
+
+            let mut new_user = existing_user
+                .lines()
+                .take_while(|l| l.trim() != ARKENCRAB_START_MARKER)
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            if !no_apply {
+                if new_user.trim() == existing_user.trim() {
+                    println!(
+                        "{} automatically update user.js with new overrides; run {}",
+                        "could not".yellow(),
+                        "`arkencrab update`".cyan()
+                    );
+                } else {
+                    let backup = profile
+                        .join("userjs_backups")
+                        .join(format!("user.js.backup.{}", now()));
+
+                    fs::create_dir_all(profile.join("userjs_backups"))?;
+                    fs::write(&backup, &existing_user)?;
+
+                    println!(
+                        "{} user.js to {}",
+                        "backed up".magenta(),
+                        backup
+                            .strip_prefix(profile.as_ref())
+                            .unwrap_or(backup.as_path())
+                            .display()
+                    );
+
+                    let overrides = read_string_with_default(profile.join("user-overrides.js"))?;
+                    new_user += "\n";
+                    new_user += ARKENCRAB_START_MARKER;
+                    new_user += "\n\n";
+                    new_user += &overrides;
+
+                    fs::write(profile.join("user.js"), &new_user)?;
+
+                    println!(
+                        "{} arkenfox v{} with new overrides",
+                        "updated".green(),
+                        existing_version.green(),
+                    );
+                }
+            }
         }
 
         Command::Completions { shell } => {
