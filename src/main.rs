@@ -118,21 +118,12 @@ fn main() -> Result<()> {
             let existing_user = read_string_with_default(profile.join("user.js"))?;
             let existing_version = find_version(&existing_user);
 
-            let backup = profile
-                .join("userjs_backups")
-                .join(format!("user.js.backup.{}", now()));
+            let backup = Path::new("userjs_backups").join(format!("user.js.backup.{}", now()));
 
             fs::create_dir_all(profile.join("userjs_backups"))?;
-            fs::write(&backup, &existing_user)?;
+            fs::write(profile.join(&backup), &existing_user)?;
 
-            println!(
-                "{} user.js to {}",
-                "backed up".magenta(),
-                backup
-                    .strip_prefix(profile.as_ref())
-                    .unwrap_or(backup.as_path())
-                    .display()
-            );
+            println!("{} user.js to {}", "backed up".magenta(), backup.display());
 
             let http = reqwest::blocking::Client::builder()
                 .https_only(true)
@@ -189,21 +180,12 @@ fn main() -> Result<()> {
             let user = read_string_with_default(profile.join("user.js"))?;
             let existing_prefs = read_string_with_default(profile.join("prefs.js"))?;
 
-            let backup = profile
-                .join("prefsjs_backups")
-                .join(format!("prefs.js.backup.{}", now()));
+            let backup = Path::new("prefsjs_backups").join(format!("prefs.js.backup.{}", now()));
 
             fs::create_dir_all(profile.join("prefsjs_backups"))?;
-            fs::write(&backup, &existing_prefs)?;
+            fs::write(profile.join(&backup), &existing_prefs)?;
 
-            println!(
-                "{} prefs.js to {}",
-                "backed up".magenta(),
-                backup
-                    .strip_prefix(profile.as_ref())
-                    .unwrap_or(backup.as_path())
-                    .display()
-            );
+            println!("{} prefs.js to {}", "backed up".magenta(), backup.display());
 
             let user_pref_keys = REGEX_USER_PREF
                 .captures_iter(&user)
@@ -263,21 +245,13 @@ fn main() -> Result<()> {
                         "`arkencrab update`".cyan()
                     );
                 } else {
-                    let backup = profile
-                        .join("userjs_backups")
-                        .join(format!("user.js.backup.{}", now()));
+                    let backup =
+                        Path::new("userjs_backups").join(format!("user.js.backup.{}", now()));
 
                     fs::create_dir_all(profile.join("userjs_backups"))?;
-                    fs::write(&backup, &existing_user)?;
+                    fs::write(profile.join(&backup), &existing_user)?;
 
-                    println!(
-                        "{} user.js to {}",
-                        "backed up".magenta(),
-                        backup
-                            .strip_prefix(profile.as_ref())
-                            .unwrap_or(backup.as_path())
-                            .display()
-                    );
+                    println!("{} user.js to {}", "backed up".magenta(), backup.display());
 
                     let overrides = read_string_with_default(profile.join("user-overrides.js"))?;
                     new_user += "\n";

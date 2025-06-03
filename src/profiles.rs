@@ -28,18 +28,14 @@ fn roaming_appdata() -> Result<PathBuf> {
 }
 
 fn default_profile_path_in<T: AsRef<Path>>(profiles_ini: T) -> Result<String> {
-    let ini = Ini::load_from_file(profiles_ini)?;
-
-    ini.iter()
-        .find_map(|(maybe_section_name, properties)| {
-            let section_name = maybe_section_name?;
-
-            if section_name.starts_with("Install") {
-                properties.get("Default").map(ToString::to_string)
-            } else {
-                None
-            }
+    Ini::load_from_file(profiles_ini)?
+        .into_iter()
+        .find_map(|(section_name, properties)| {
+            section_name
+                .is_some_and(|s| s.starts_with("Install"))
+                .then(|| properties.get("Default").map(|v| v.to_string()))
         })
+        .flatten()
         .ok_or_eyre("unable to obtain default profile from profiles.ini")
 }
 
@@ -95,19 +91,17 @@ pub fn default_profile() -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use eyre::Result;
+    use std::path::Path;
 
     #[test]
     fn can_find_default_profile_path() -> Result<()> {
-        let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let profiles_ini = root_dir.join("src/profiles.ini");
+        let root_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let profiles_ini = root_dir.join("src/profiles.test.ini");
 
         let result = super::default_profile_path_in(&profiles_ini)?;
-        let expected = String::from("Profiles/arkenfox");
+        assert_eq!(result, "Profiles/arkenfox");
 
-        assert_eq!(result, expected);
         Ok(())
     }
 }
