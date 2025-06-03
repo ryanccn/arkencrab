@@ -50,6 +50,9 @@ pub enum Command {
         editor: Option<String>,
     },
 
+    /// Print the profile being used
+    Profile {},
+
     /// Generate shell completions
     Completions {
         /// The shell to generate completions for

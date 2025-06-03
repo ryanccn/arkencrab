@@ -53,7 +53,6 @@ fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
         Cow::Owned(profile)
     };
 
-    println!("{} {}", "using profile".blue(), profile.display());
     Ok(profile)
 }
 
@@ -114,6 +113,7 @@ fn main() -> Result<()> {
             esr,
         } => {
             let profile = resolve_profile(&cli)?;
+            println!("{} {}", "using profile".blue(), profile.display());
 
             let existing_user = read_string_with_default(profile.join("user.js"))?;
             let existing_version = find_version(&existing_user);
@@ -176,6 +176,7 @@ fn main() -> Result<()> {
 
         Command::PrefsClean { diff } => {
             let profile = resolve_profile(&cli)?;
+            println!("{} {}", "using profile".blue(), profile.display());
 
             let user = read_string_with_default(profile.join("user.js"))?;
             let existing_prefs = read_string_with_default(profile.join("prefs.js"))?;
@@ -209,6 +210,7 @@ fn main() -> Result<()> {
 
         Command::Edit { editor, no_apply } => {
             let profile = resolve_profile(&cli)?;
+            println!("{} {}", "using profile".blue(), profile.display());
 
             let mut editor = editor
                 .as_ref()
@@ -268,6 +270,11 @@ fn main() -> Result<()> {
                     );
                 }
             }
+        }
+
+        Command::Profile {} => {
+            let profile = resolve_profile(&cli)?;
+            println!("{}", profile.display());
         }
 
         Command::Completions { shell } => {
