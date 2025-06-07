@@ -21,9 +21,6 @@ mod profiles;
 
 static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-static USER_JS_URL: &str =
-    "https://raw.githubusercontent.com/arkenfox/user.js/refs/heads/master/user.js";
-
 #[cfg(unix)]
 static DEFAULT_EDITOR: &str = "nano";
 #[cfg(windows)]
@@ -110,6 +107,7 @@ fn main() -> Result<()> {
         Command::Update {
             diff,
             no_overrides,
+            r#ref,
             esr,
         } => {
             let profile = resolve_profile(&cli)?;
@@ -130,7 +128,13 @@ fn main() -> Result<()> {
                 .user_agent(USER_AGENT)
                 .build()?;
 
-            let mut new_user = http.get(USER_JS_URL).send()?.error_for_status()?.text()?;
+            let mut new_user = http
+                .get(format!(
+                    "https://raw.githubusercontent.com/arkenfox/user.js/refs/heads/{ref}/user.js"
+                ))
+                .send()?
+                .error_for_status()?
+                .text()?;
 
             let this_version = find_version(&new_user);
 

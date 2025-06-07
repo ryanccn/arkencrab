@@ -27,6 +27,10 @@ pub enum Command {
         #[clap(short, long, env = "ARKENCRAB_UPDATE_NO_OVERRIDES")]
         no_overrides: bool,
 
+        /// Reference in the arkenfox repository to use
+        #[clap(short, long, default_value_t = String::from("master"))]
+        r#ref: String,
+
         /// Enable preferences for Firefox ESR
         #[clap(long, env = "ARKENCRAB_ESR")]
         esr: bool,
