@@ -15,7 +15,7 @@ clap = { version = "4.5.39", features = ["derive", "env"] }
 clap_complete = "4.5.52"
 color-eyre = { version = "0.6.5", default-features = false }
 eyre = "0.6.12"
-owo-colors = "4.2.1"
+owo-colors = "4.2.2"
 regex = "1.11.1"
 rust-ini = "0.21.1"
 reqwest = { version = "0.12.19", features = ["blocking", "charset", "http2", "macos-system-configuration", "rustls-tls-webpki-roots", "gzip", "brotli", "zstd"], default-features = false }
