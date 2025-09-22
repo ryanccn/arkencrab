@@ -26,14 +26,19 @@ jobs:
 
     strategy:
       matrix:
+        target:
+          - "aarch64-apple-darwin"
+          - "x86_64-apple-darwin"
+          - "aarch64-pc-windows-msvc"
+          - "x86_64-pc-windows-msvc"
         include:
-          - target: aarch64-apple-darwin
-            runner: macos-14
-          - target: x86_64-apple-darwin
+          - target: "aarch64-apple-darwin"
             runner: macos-latest
-          - target: aarch64-pc-windows-msvc
-            runner: windows-11-arm
-          - target: x86_64-pc-windows-msvc
+          - target: "x86_64-apple-darwin"
+            runner: macos-latest
+          - target: "aarch64-pc-windows-msvc"
+            runner: windows-latest
+          - target: "x86_64-pc-windows-msvc"
             runner: windows-latest
       fail-fast: false
 
@@ -41,21 +46,21 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
         with:
           persist-credentials: false
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # ratchet:dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@5d458579430fc14a04a08a1e7d3694f545e91ce6 # ratchet:dtolnay/rust-toolchain@stable
         with:
           target: ${{ matrix.target }}
 
       - name: Setup Rust cache
-        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # ratchet:Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # ratchet:Swatinem/rust-cache@v2
         if: ${{ inputs.disable-cache != true }}
 
       - name: Install cargo-auditable
-        uses: taiki-e/install-action@735e5933943122c5ac182670a935f54a949265c1 # ratchet:taiki-e/install-action@v2
+        uses: taiki-e/install-action@d6912b47771be2c443ec90dbb3d28e023987e782 # ratchet:taiki-e/install-action@v2
         with:
           tool: cargo-auditable
 
@@ -66,7 +71,7 @@ jobs:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
       - name: Generate build provenance attestations
-        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # ratchet:actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # ratchet:actions/attest-build-provenance@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-path: |
@@ -92,28 +97,23 @@ jobs:
         target:
           - "x86_64-unknown-linux-musl"
           - "aarch64-unknown-linux-musl"
-        include:
-          - target: "x86_64-unknown-linux-musl"
-            runner: ubuntu-24.04
-          - target: "aarch64-unknown-linux-musl"
-            runner: ubuntu-24.04-arm
 
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5
         with:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # ratchet:cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@a809471b5c7c913aa67bec8f459a11a0decc3fce # ratchet:cachix/install-nix-action@v31
 
       - name: Build
         run: nix build --fallback --print-build-logs '.#arkencrab-static-${{ matrix.target }}'
 
       - name: Generate build provenance attestations
-        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # ratchet:actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # ratchet:actions/attest-build-provenance@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-path: ./result/bin/arkencrab

@@ -42,7 +42,7 @@ static REGEX_USER_PREF: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-fn resolve_profile(cli: &Cli) -> Result<Cow<Path>> {
+fn resolve_profile(cli: &'_ Cli) -> Result<Cow<'_, Path>> {
     let profile = if let Some(p) = &cli.profile {
         Cow::Borrowed(p.as_path())
     } else {
