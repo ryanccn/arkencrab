@@ -83,7 +83,7 @@ fn print_diff(old: &str, new: &str) {
                 .map(|change| {
                     let plain = format!("{}\t{}", change.tag(), change);
                     match change.tag() {
-                        ChangeTag::Equal => plain.to_string(),
+                        ChangeTag::Equal => plain.clone(),
                         ChangeTag::Insert => plain.green().to_string(),
                         ChangeTag::Delete => plain.red().to_string(),
                     }
@@ -160,7 +160,7 @@ fn main() -> Result<()> {
                 "{} arkenfox v{} {} v{}{}",
                 "updated".green(),
                 if existing_version == this_version {
-                    existing_version.to_string()
+                    existing_version.clone()
                 } else {
                     existing_version.yellow().to_string()
                 },

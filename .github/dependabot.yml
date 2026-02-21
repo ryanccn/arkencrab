@@ -10,7 +10,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      cargo-minor-patch:
+      minor-patch:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
