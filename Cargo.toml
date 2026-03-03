@@ -11,15 +11,15 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 anstream = "1.0.0"
-chrono = { version = "0.4.43", default-features = false, features = ["std", "clock"] }
+chrono = { version = "0.4.44", default-features = false, features = ["std", "clock"] }
 clap = { version = "4.5.60", features = ["derive", "env"] }
 clap_complete = "4.5.66"
 color-eyre = { version = "0.6.5", default-features = false }
 eyre = "0.6.12"
-owo-colors = "4.2.3"
+owo-colors = "4.3.0"
 regex = "1.12.3"
+reqwest = { version = "0.13.2", features = ["blocking", "charset", "query", "json", "deflate", "gzip", "brotli", "zstd"] }
 rust-ini = "0.21.3"
-reqwest = { version = "0.13.2", features = ["blocking", "charset", "query", "json", "deflate", "gzip", "brotli", "zstd"], default-features = false }
 similar = "2.7.0"
 shlex = "1.3.0"
 
