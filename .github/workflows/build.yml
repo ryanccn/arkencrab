@@ -56,11 +56,11 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Setup Rust cache
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # ratchet:Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # ratchet:Swatinem/rust-cache@v2
         if: ${{ inputs.disable-cache != true }}
 
       - name: Install cargo-auditable
-        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # ratchet:taiki-e/install-action@v2
+        uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # ratchet:taiki-e/install-action@v2
         with:
           tool: cargo-auditable
 
@@ -79,7 +79,7 @@ jobs:
             ./target/${{ matrix.target }}/release/arkencrab.exe
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # ratchet:actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           if-no-files-found: "error"
           name: arkencrab-${{ matrix.target }}
@@ -107,7 +107,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@19effe9fe722874e6d46dd7182e4b8b7a43c4a99 # ratchet:cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # ratchet:cachix/install-nix-action@v31
 
       - name: Build
         run: nix build --fallback --print-build-logs '.#arkencrab-static-${{ matrix.target }}'
@@ -119,7 +119,7 @@ jobs:
           subject-path: ./result/bin/arkencrab
 
       - name: Upload artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # ratchet:actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           if-no-files-found: "error"
           name: arkencrab-${{ matrix.target }}
